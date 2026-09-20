@@ -182,6 +182,8 @@ export default {
   --td-brand-color: var(--accent-subtle-color);
   --td-brand-color-active: var(--accent-subtle-color);
   --td-text-color-anti: var(--accent-color);
+  --td-button-primary-color: var(--accent-color);
+  --td-button-primary-bg-color: var(--accent-subtle-color);
 }
 
 .base-button--look-contrast {
@@ -240,9 +242,12 @@ export default {
 }
 
 .base-button--look-fog {
-  --td-brand-color: var(--surface-subtle-color);
-  --td-brand-color-active: var(--surface-subtle-color);
+  --td-brand-color: var(--text-secondary-color);
+  --td-brand-color-active: var(--text-color);
   --td-text-color-anti: var(--text-secondary-color);
+  --td-button-primary-outline-color: var(--text-secondary-color);
+  --td-button-primary-outline-border-color: var(--border-color);
+  --td-button-primary-outline-active-color: var(--text-color);
   box-shadow: inset 0 0 0 1px var(--border-color);
 }
 
@@ -250,6 +255,8 @@ export default {
 .base-button--ghost.base-button--look-soft {
   --td-brand-color: var(--accent-subtle-color);
   --td-text-color-anti: var(--accent-color);
+  --td-button-primary-color: var(--accent-color);
+  --td-button-primary-bg-color: var(--accent-subtle-color);
 }
 
 .base-button--ghost.base-button--look-quiet {

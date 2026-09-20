@@ -32,6 +32,25 @@ function relativeScreenshot(group, filename) {
   return `${group}/${filename}.png`;
 }
 
+function contrastRatio(foreground, background) {
+  const channels = (value) => (String(value).match(/[\d.]+/g) || [])
+    .slice(0, 3)
+    .map(Number)
+    .map((channel) => {
+      const normalized = channel / 255;
+      return normalized <= 0.04045
+        ? normalized / 12.92
+        : ((normalized + 0.055) / 1.055) ** 2.4;
+    });
+  const luminance = (value) => {
+    const [red, green, blue] = channels(value);
+    return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
+  };
+  const light = Math.max(luminance(foreground), luminance(background));
+  const dark = Math.min(luminance(foreground), luminance(background));
+  return (light + 0.05) / (dark + 0.05);
+}
+
 async function capture(page, {
   actualPathExpected = '',
   avatarState = 'image',
@@ -90,6 +109,44 @@ test.afterAll(async () => {
     stateSampleCount: STATE_VISUAL_MATRIX.length,
     themeJourneyVariantCount: THEME_JOURNEY_VISUAL_MATRIX.length,
     outputDirectory: visualReviewOutput,
+  });
+});
+
+[
+  { look: 'soft', route: '/pages/search', screenshot: 'button-soft-search' },
+  { look: 'fog', route: '/pages/circles/index', screenshot: 'button-fog-circles' },
+  { look: 'fog', route: '/pages/collections/index', screenshot: 'button-fog-collections' },
+].forEach(({ look, route, screenshot }) => {
+  test(`button contrast ${look} ${route} · #410`, async ({ page }) => {
+    await installVisualFixture(page, { persona: 'member', theme: 'light' });
+    await page.addInitScript((selectedLook) => {
+      localStorage.setItem('ui_button_style', selectedLook);
+      localStorage.setItem('ui_button_ghost', selectedLook);
+      localStorage.setItem('ui_button_effect', 'none');
+    }, look);
+    await openVisualRoute(page, route, { persona: 'member' });
+    await page.evaluate((selectedLook) => {
+      window.uni?.setStorageSync('ui_button_style', selectedLook);
+      window.uni?.setStorageSync('ui_button_ghost', selectedLook);
+      window.uni?.$emit('theme-change', {
+        effect: 'none',
+        ghostLook: selectedLook,
+        primaryLook: selectedLook,
+      });
+    }, look);
+    const buttons = page.locator(`.base-button--look-${look}:visible`);
+    await expect(buttons.first()).toBeVisible();
+    const colors = await buttons.evaluateAll((nodes) => nodes.map((node) => {
+      const styles = getComputedStyle(node);
+      return { background: styles.backgroundColor, foreground: styles.color };
+    }));
+    colors.forEach(({ background, foreground }) => {
+      expect(foreground).not.toBe(background);
+      expect(contrastRatio(foreground, background)).toBeGreaterThanOrEqual(4.5);
+    });
+    await stableScreenshot(page, {
+      path: visualScreenshotPath('themes', screenshot),
+    });
   });
 });
 
