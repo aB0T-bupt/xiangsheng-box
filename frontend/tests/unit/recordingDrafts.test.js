@@ -5,6 +5,7 @@ import {
   clearInvalidRecordingDraftAudio,
   discardLegacyRecordingDrafts,
   draftOwner,
+  endGuestDraftSession,
   listLegacyRecordingDrafts,
   migrateLegacyRecordingDrafts,
   saveRecordingDraft,
@@ -12,6 +13,8 @@ import {
   listRecordingDrafts,
   deleteRecordingDraft,
   listRecordingDraftsWithAudioStatus,
+  MAX_RECORDING_DRAFTS,
+  RECORDING_DRAFT_LIMIT_ERROR,
 } from '@/services/recordingDrafts';
 import { searchHistory, rememberSearch, clearSearchHistory } from '@/services/entrySearchAssist';
 
@@ -108,10 +111,32 @@ it('writes an explicit v2 schema and isolates guest sessions', async () => {
     formatVersion: 2,
     owner: firstOwner,
   });
-  storage.delete('recording_drafts:guest_session:v2');
+  endGuestDraftSession();
   const secondOwner = draftOwner();
   expect(secondOwner).not.toBe(firstOwner);
   expect(listRecordingDrafts(secondOwner)).toEqual([]);
+});
+
+it('rejects a new draft at the limit before persisting audio or deleting an older draft', async () => {
+  const owner = 'user:1';
+  const existing = Array.from({ length: MAX_RECORDING_DRAFTS }, (_, index) => ({
+    id: `draft-${index}`,
+    owner,
+    schemaVersion: 2,
+    formatVersion: 2,
+    form: { original_gloss: `草稿${index}` },
+  }));
+  storage.set(`recording_drafts:v2:${owner}`, JSON.stringify(existing));
+
+  await expect(saveRecordingDraft(input(), owner)).rejects.toMatchObject({
+    code: RECORDING_DRAFT_LIMIT_ERROR,
+    limit: MAX_RECORDING_DRAFTS,
+  });
+
+  expect(persistDraftAudio).not.toHaveBeenCalled();
+  expect(removeDraftAudio).not.toHaveBeenCalled();
+  expect(listRecordingDrafts(owner).map((draft) => draft.id))
+    .toEqual(existing.map((draft) => draft.id));
 });
 
 it('clears only unavailable audio and keeps the draft fields', async () => {

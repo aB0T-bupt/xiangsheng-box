@@ -4,6 +4,7 @@ import {
 
 export const RECORDING_DRAFT_SCHEMA_VERSION = 2;
 export const MAX_RECORDING_DRAFTS = 20;
+export const RECORDING_DRAFT_LIMIT_ERROR = 'recording-draft-limit';
 
 const STORAGE_PREFIX = 'recording_drafts:v2:';
 const GUEST_SESSION_KEY = 'recording_drafts:guest_session:v2';
@@ -14,6 +15,19 @@ const key = (owner) => `${STORAGE_PREFIX}${owner}`;
 
 function createGuestSessionId() {
   return `session_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+export function endGuestDraftSession() {
+  if (typeof uni !== 'undefined' && typeof uni.removeStorageSync === 'function') {
+    uni.removeStorageSync(GUEST_SESSION_KEY);
+  }
+}
+
+function draftLimitError() {
+  const error = new Error(`草稿箱已满（最多 ${MAX_RECORDING_DRAFTS} 条），请先到草稿箱删除不需要的草稿`);
+  error.code = RECORDING_DRAFT_LIMIT_ERROR;
+  error.limit = MAX_RECORDING_DRAFTS;
+  return error;
 }
 
 export function draftOwner() {
@@ -68,7 +82,9 @@ export async function saveRecordingDraft({
   recordingType,
 }, owner = draftOwner()) {
   const draftId = id || `draft_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-  const old = listRecordingDrafts(owner).find((item) => item.id === draftId);
+  const current = listRecordingDrafts(owner);
+  const old = current.find((item) => item.id === draftId);
+  if (!old && current.length >= MAX_RECORDING_DRAFTS) throw draftLimitError();
   let storedAudio = null;
   let audioError = false;
   try {
@@ -95,10 +111,18 @@ export async function saveRecordingDraft({
 
   // Re-read after async audio persistence so another draft's save is not overwritten.
   const existing = listRecordingDrafts(owner).filter((draft) => draft.id !== draftId);
+  if (!old && existing.length >= MAX_RECORDING_DRAFTS) {
+    if (storedAudio?.storage === 'saved-file') {
+      const error = draftLimitError();
+      error.persistedAudio = storedAudio;
+      throw error;
+    }
+    await removeDraftAudio(storedAudio);
+    throw draftLimitError();
+  }
   const next = [item, ...existing];
-  const evicted = next.slice(MAX_RECORDING_DRAFTS);
   try {
-    uni.setStorageSync(key(owner), JSON.stringify(next.slice(0, MAX_RECORDING_DRAFTS)));
+    uni.setStorageSync(key(owner), JSON.stringify(next));
   } catch (error) {
     // saveFile moves the temporary file. Keep its new path available for retry.
     if (storedAudio?.storage === 'saved-file') {
@@ -110,7 +134,6 @@ export async function saveRecordingDraft({
     throw new Error('草稿空间不足，请保留本页并重试');
   }
   if (old?.audio && !sameAudio(old.audio, storedAudio)) await removeDraftAudio(old.audio);
-  await Promise.all(evicted.map((draft) => removeDraftAudio(draft.audio)));
   return item;
 }
 
@@ -269,6 +292,7 @@ export default {
   deleteRecordingDraft,
   discardLegacyRecordingDrafts,
   draftOwner,
+  endGuestDraftSession,
   listLegacyRecordingDrafts,
   listRecordingDrafts,
   listRecordingDraftsWithAudioStatus,

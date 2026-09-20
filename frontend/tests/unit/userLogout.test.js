@@ -11,6 +11,8 @@ describe('user logout storage policy', () => {
       token: 'token-1',
       id: '7',
       auth_intercept_intent: 'intent',
+      'recording_drafts:guest_session:v2': 'session-before-login',
+      'recording_drafts:v2:guest:session-before-login': '[{"id":"guest-draft-1"}]',
       'can_drafts:user:7': '[{"id":"draft-1"}]',
       'recording_drafts:v2:user:7': '[{"id":"recording-draft-1"}]',
       search_history: '["moon"]',
@@ -27,6 +29,10 @@ describe('user logout storage policy', () => {
     };
     globalThis.getApp = vi.fn(() => app);
     globalThis.uni = {
+      getStorageSync: vi.fn((key) => storage[key] || ''),
+      setStorageSync: vi.fn((key, value) => {
+        storage[key] = value;
+      }),
       removeStorageSync: vi.fn((key) => {
         delete storage[key];
       }),
@@ -41,6 +47,9 @@ describe('user logout storage policy', () => {
     expect(storage.auth_intercept_intent).toBeUndefined();
     expect(storage['can_drafts:user:7']).toBe('[{"id":"draft-1"}]');
     expect(storage['recording_drafts:v2:user:7']).toBe('[{"id":"recording-draft-1"}]');
+    expect(storage['recording_drafts:guest_session:v2']).toBeUndefined();
+    expect(storage['recording_drafts:v2:guest:session-before-login'])
+      .toBe('[{"id":"guest-draft-1"}]');
     expect(storage.search_history).toBe('["moon"]');
     expect(storage.ui_theme_pack).toBeUndefined();
     expect(storage.ui_theme_outfits).toBeUndefined();
