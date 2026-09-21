@@ -542,3 +542,59 @@ class EntryFirstApiTests(TestCase):
         self.assertEqual(response.json()["code"], 400)
         self.assertEqual(boolean.status_code, 400)
         self.assertEqual(boolean.json()["code"], 400)
+
+    def test_legacy_link_resolver_returns_only_one_visible_audited_target(self):
+        entry, _ = self.make_entry("旧词条", "旧")
+        entry.metadata = {
+            "legacy": {
+                "system": "hinghwa-dict-backend",
+                "table": "word_word",
+                "id": 42,
+            }
+        }
+        entry.save(update_fields=["metadata"])
+        resolved = self.client.get(
+            "/legacy-links/resolve/",
+            {"namespace": "hinghwa", "type": "entry", "legacy_id": 42},
+        )
+
+        self.assertEqual(resolved.status_code, 200)
+        self.assertEqual(
+            resolved.data,
+            {"status": "resolved", "target_type": "entry", "target_id": entry.id},
+        )
+
+        duplicate, _ = self.make_entry("冲突词条", "冲")
+        duplicate.metadata = entry.metadata
+        duplicate.save(update_fields=["metadata"])
+        conflict = self.client.get(
+            "/legacy-links/resolve/",
+            {"namespace": "hinghwa", "type": "entry", "legacy_id": 42},
+        )
+        self.assertEqual(conflict.data, {"status": "conflict"})
+
+    def test_legacy_link_resolver_hides_private_targets_and_validates_whitelist(self):
+        private, _ = self.make_entry("私有旧词条", "隐")
+        private.visibility = False
+        private.metadata = {
+            "legacy": {
+                "system": "hinghwa-dict-backend",
+                "table": "word_word",
+                "id": 77,
+            }
+        }
+        private.save(update_fields=["visibility", "metadata"])
+        anonymous = APIClient()
+
+        hidden = anonymous.get(
+            "/legacy-links/resolve/",
+            {"namespace": "hinghwa", "type": "entry", "legacy_id": 77},
+        )
+        invalid = anonymous.get(
+            "/legacy-links/resolve/",
+            {"namespace": "unknown", "type": "entry", "legacy_id": 77},
+        )
+
+        self.assertEqual(hidden.status_code, 200)
+        self.assertEqual(hidden.data, {"status": "unmapped"})
+        self.assertEqual(invalid.status_code, 400)

@@ -4,6 +4,10 @@
     active="record"
   >
     <view class="record-page">
+      <StationSourceBanner
+        :context="stationContext"
+        @continue="continueStation"
+      />
       <view class="record-draft-actions">
         <BaseButton
           variant="ghost"
@@ -351,6 +355,7 @@ import BaseButton from '@/components/BaseButton.vue';
 import BaseField from '@/components/BaseField.vue';
 import BaseForm from '@/components/BaseForm.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
+import StationSourceBanner from '@/components/StationSourceBanner.vue';
 import { requireAuth } from '@/services/authGuard';
 import {
   createRecording,
@@ -363,7 +368,8 @@ import {
 import { uploadFile } from '@/services/file';
 import { notify, notifySuccess } from '@/services/feedback';
 import { listAllDialects } from '@/services/guantou';
-import { goRecordingDetail, goRecordingDrafts } from '@/services/navigation';
+import { goRecordingDetail, goRecordingDrafts, goStation } from '@/services/navigation';
+import { parseStationContext, stationContextParams } from '@/services/stationContext';
 import {
   draftOwner, saveRecordingDraft, restoreRecordingDraft, deleteRecordingDraft,
 } from '@/services/recordingDrafts';
@@ -386,6 +392,7 @@ export default {
     BaseField,
     BaseForm,
     DialectSelector,
+    StationSourceBanner,
     TCell,
     TCollapse,
     TCollapsePanel,
@@ -423,6 +430,8 @@ export default {
       savedDraftSignature: '',
       submitted: false,
       capabilityAvailable: true,
+      stationContext: null,
+      requestedDialectId: null,
     };
   },
   computed: {
@@ -469,6 +478,11 @@ export default {
       );
       return dialect ? dialectBreadcrumb(dialect, this.dialects) : '请选择已知范围';
     },
+    stationParams() {
+      return stationContextParams(this.stationContext, {
+        dialectId: this.form.usage_dialect_id || this.requestedDialectId,
+      });
+    },
   },
   watch: {
     form: { deep: true, handler() { this.scheduleDraft(); } },
@@ -476,6 +490,8 @@ export default {
     selectedEntry() { this.scheduleDraft(); },
   },
   async onLoad(options = {}) {
+    this.stationContext = parseStationContext(options);
+    this.requestedDialectId = this.stationContext?.dialectId || null;
     if (!requireAuth('record_recording', { page: 'record' })) return;
     this.capabilityAvailable = ensureCapability(CAPABILITIES.RECORDING, 'record');
     if (!this.capabilityAvailable) return;
@@ -578,7 +594,11 @@ export default {
     async loadDialects() {
       try {
         this.dialects = await listAllDialects();
-        if (this.primaryDialect?.id) this.form.usage_dialect_id = this.primaryDialect.id;
+        const requested = this.dialects.find(
+          (item) => String(item.id) === String(this.requestedDialectId),
+        );
+        if (requested?.id) this.form.usage_dialect_id = requested.id;
+        else if (this.primaryDialect?.id) this.form.usage_dialect_id = this.primaryDialect.id;
       } catch (error) {
         this.dialects = [];
       }
@@ -680,7 +700,11 @@ export default {
         if (this.draftId) {
           try { await deleteRecordingDraft(this.draftId, this.ownerScope); } catch (error) { notify({ title: '乡音已提交，请手动清理旧草稿' }); }
         }
-        goRecordingDetail(recording.id, { replace: true });
+        if (this.stationContext) {
+          goRecordingDetail(recording.id, this.stationParams, { replace: true });
+        } else {
+          goRecordingDetail(recording.id, { replace: true });
+        }
       } catch (error) {
         trackProductEvent(PRODUCT_EVENTS.RECORDING_SUBMIT, {
           surface: 'record',
@@ -696,6 +720,9 @@ export default {
       } finally {
         this.submitting = false;
       }
+    },
+    continueStation() {
+      if (this.stationContext) goStation(this.stationParams);
     },
   },
 };

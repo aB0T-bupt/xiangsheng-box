@@ -21,6 +21,7 @@ Entry，再分别关联 WALK、RUN。搜索相同写法时返回多条清楚标�
 ## 主要路径
 
 - `GET /entries/`：词条优先搜索；支持地区、录音有无、状态、IPA、罗马字等筛选。
+- `GET /legacy-links/resolve/`：只按迁移审计元数据解析当前用户可见的旧 Entry / Recording，明确返回 `resolved / unmapped / conflict`。
 - `POST /recordings/`：最低提交音频、使用地区和大意；写法、音标可后补。
 - `POST /recording-entry-links/`：提出主要词条、句中词或竞争解释。
 - `POST /usage-attestations/`：提交地区使用补证。

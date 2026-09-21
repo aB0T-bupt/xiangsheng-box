@@ -12,6 +12,14 @@
       "style": {}
     },
     {
+      "path": "pages/stations/index",
+      "style": {}
+    },
+    {
+      "path": "pages/stations/legacy",
+      "style": {}
+    },
+    {
       "path": "pages/recordings/create",
       "style": {}
     },

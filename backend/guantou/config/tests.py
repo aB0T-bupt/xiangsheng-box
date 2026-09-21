@@ -2,6 +2,7 @@ import os
 import subprocess
 import sys
 import tempfile
+from pathlib import Path
 
 from django.conf import settings
 from django.test import SimpleTestCase, override_settings
@@ -73,13 +74,15 @@ class RuntimeConfigurationTests(SimpleTestCase):
         self.assertIn("must be between 1 and 90", result.stderr)
 
     def test_legacy_app_secrect_spelling_remains_a_fallback(self):
-        with tempfile.NamedTemporaryFile(mode="w", encoding="utf-8") as env_file:
-            env_file.write("APP_SECRECT=legacy-compatible-value\n")
-            env_file.flush()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            env_file = Path(temp_dir) / ".env"
+            env_file.write_text(
+                "APP_SECRECT=legacy-compatible-value\n", encoding="utf-8"
+            )
             environment = os.environ.copy()
             environment.pop("APP_SECRET", None)
             environment.pop("APP_SECRECT", None)
-            environment["ENV_FILE"] = env_file.name
+            environment["ENV_FILE"] = str(env_file)
             environment["PYTHONPYCACHEPREFIX"] = "/tmp/guantou-config-test-pycache"
             result = subprocess.run(
                 [

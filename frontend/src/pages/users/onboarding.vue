@@ -344,7 +344,7 @@ export default {
     },
     abandon() {
       clearUserInfo();
-      goSearch({ reset: true });
+      goSearch({}, { reset: true });
     },
   },
 };

@@ -728,6 +728,29 @@ paths:
         "404":
           description: 对象不存在或不可见
       security: []
+  /legacy-links/resolve/:
+    get:
+      tags: [Entries]
+      operationId: resolveLegacyLink
+      summary: 按迁移审计元数据解析一个可见旧资料目标
+      security: []
+      parameters:
+        - { name: namespace, in: query, required: true, schema: { type: string, enum: [hinghwa] } }
+        - { name: type, in: query, required: true, schema: { type: string, enum: [entry, recording] } }
+        - { name: legacy_id, in: query, required: true, schema: { type: integer, minimum: 1 } }
+      responses:
+        "200":
+          description: 唯一映射、无映射或冲突状态
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status]
+                properties:
+                  status: { type: string, enum: [resolved, unmapped, conflict] }
+                  target_type: { type: string, enum: [entry, recording] }
+                  target_id: { type: integer }
+        "400": { description: namespace、type 或 legacy_id 非法 }
   /entries/:
     get:
       tags: [Entries]

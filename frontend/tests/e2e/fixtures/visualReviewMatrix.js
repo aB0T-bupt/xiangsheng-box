@@ -10,6 +10,12 @@ export const ROUTE_VISUAL_MATRIX = Object.freeze([
     route: '/pages/search', target: '/pages/search', slug: 'search', issues: [342], persona: 'guest',
   },
   {
+    route: '/pages/stations/index', target: '/pages/stations/index?station=hinghwa', slug: 'station-hinghwa', issues: [428], persona: 'guest',
+  },
+  {
+    route: '/pages/stations/legacy', target: '/pages/stations/legacy?station=hinghwa&namespace=hinghwa&type=entry&legacy_id=1', slug: 'station-legacy-missing', issues: [428], persona: 'guest',
+  },
+  {
     route: '/pages/recordings/create', target: '/pages/recordings/create?dialect_id=3', slug: 'record', issues: [343], persona: 'member',
   },
   {
@@ -127,6 +133,14 @@ export const STATE_VISUAL_MATRIX = Object.freeze([
 ]);
 
 export const THEME_JOURNEY_VISUAL_MATRIX = Object.freeze([
+  {
+    name: '莆仙站暗色入口',
+    target: '/pages/stations/index?station=hinghwa',
+    slug: 'station-hinghwa-dark-guest',
+    issues: [428],
+    persona: 'guest',
+    theme: 'dark',
+  },
   {
     name: '局部装扮暗色目录',
     target: '/pages/users/theme-dress?group=navbar',

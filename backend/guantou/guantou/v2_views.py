@@ -64,6 +64,14 @@ from .v2_serializers import (
 )
 from .v2_governance import perform_curation_action
 
+LEGACY_LINK_NAMESPACES = {
+    "hinghwa": {
+        "system": "hinghwa-dict-backend",
+        "entry_table": "word_word",
+        "recording_table": "word_pronunciation",
+    }
+}
+
 
 def parse_boolean(value, name):
     if value is None or value == "":
@@ -74,6 +82,52 @@ def parse_boolean(value, name):
     if normalized in {"0", "false", "no"}:
         return False
     raise BadRequestException(f"{name} 只能是 true 或 false")
+
+
+class LegacyLinkResolveView(APIView):
+    """Resolve one allowlisted legacy identifier without guessing a target."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        namespace = str(request.query_params.get("namespace") or "").strip().lower()
+        resource_type = str(request.query_params.get("type") or "").strip().lower()
+        legacy_id = str(request.query_params.get("legacy_id") or "").strip()
+        source = LEGACY_LINK_NAMESPACES.get(namespace)
+        if source is None:
+            raise BadRequestException("namespace 不在允许的旧资料来源中")
+        if resource_type not in {"entry", "recording"}:
+            raise BadRequestException("type 只能是 entry 或 recording")
+        if not legacy_id.isdigit() or int(legacy_id) <= 0:
+            raise BadRequestException("legacy_id 必须是正整数")
+
+        model = Entry if resource_type == "entry" else Recording
+        table = source[f"{resource_type}_table"]
+        visible = (
+            visible_entries_for_user(request.user)
+            if model is Entry
+            else visible_recordings_for_user(request.user)
+        )
+        matches = list(
+            visible.filter(
+                metadata__legacy__system=source["system"],
+                metadata__legacy__table=table,
+                metadata__legacy__id=int(legacy_id),
+            )
+            .order_by("id")
+            .values_list("id", flat=True)[:2]
+        )
+        if not matches:
+            return Response({"status": "unmapped"})
+        if len(matches) > 1:
+            return Response({"status": "conflict"})
+        return Response(
+            {
+                "status": "resolved",
+                "target_type": resource_type,
+                "target_id": matches[0],
+            }
+        )
 
 
 def selected_dialect_ids(request):

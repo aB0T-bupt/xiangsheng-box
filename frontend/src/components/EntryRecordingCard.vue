@@ -61,7 +61,7 @@
         size="small"
         variant="ghost"
         text="录音详情"
-        @click="goRecordingDetail(recording.id)"
+        @click="goRecordingDetail(recording.id, detailParams)"
       />
       <BaseButton
         size="small"
@@ -124,6 +124,7 @@ export default {
     community: { type: Boolean, default: true },
     compact: { type: Boolean, default: false },
     detailLink: { type: Boolean, default: true },
+    detailParams: { type: Object, default: () => ({}) },
     attested: { type: Boolean, default: false },
   },
   emits: ['attest', 'continue', 'open-entry'],

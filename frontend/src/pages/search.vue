@@ -5,6 +5,10 @@
     @scrolltolower="loadMore"
   >
     <view class="entry-search">
+      <StationSourceBanner
+        :context="stationContext"
+        @continue="continueStation"
+      />
       <view class="entry-search__bar">
         <BaseField
           v-model="filters.keyword"
@@ -35,7 +39,7 @@
           size="small"
           variant="ghost"
           :text="`${entryTitle(entry)} · ${entry.summary || ''}`"
-          @click="goEntryDetail(entry.id)"
+          @click="openEntry(entry.id)"
         />
       </view>
       <view
@@ -75,7 +79,7 @@
           size="small"
           variant="ghost"
           :text="entryTitle(entry)"
-          @click="goEntryDetail(entry.id)"
+          @click="openEntry(entry.id)"
         />
       </view>
       <DialectSelector
@@ -138,7 +142,7 @@
           title="没有找到匹配词条"
           description="换一个写法、意思或读音再试；也可以先录下你听到的说法。"
           action-text="录一段，让大家帮忙整理"
-          @action="goRecord"
+          @action="startRecording"
         />
       </view>
       <view
@@ -322,8 +326,8 @@
           role="button"
           tabindex="0"
           :aria-label="`查看词条：${entryTitle(entry)}`"
-          @tap="goEntryDetail(entry.id)"
-          @keydown.enter="goEntryDetail(entry.id)"
+          @tap="openEntry(entry.id)"
+          @keydown.enter="openEntry(entry.id)"
         >
           <view class="entry-result__heading">
             <text class="entry-result__title">
@@ -384,6 +388,7 @@ import BaseField from '@/components/BaseField.vue';
 import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import DialectSelector from '@/components/DialectSelector.vue';
+import StationSourceBanner from '@/components/StationSourceBanner.vue';
 import {
   buildEntrySearchParams,
   dialectLabel,
@@ -396,8 +401,9 @@ import {
 } from '@/services/entrySearchAssist';
 import { listAllDialects } from '@/services/guantou';
 import {
-  goCollections, goEntryDetail, goHome, goRecord,
+  goCollections, goEntryDetail, goHome, goRecord, goStation,
 } from '@/services/navigation';
+import { parseStationContext, stationContextParams } from '@/services/stationContext';
 import { dialectBreadcrumb } from '@/utils/dialectTree';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
@@ -473,6 +479,7 @@ export default {
     BaseLoading,
     EmptyState,
     DialectSelector,
+    StationSourceBanner,
     TCell,
     TCollapse,
     TCollapsePanel,
@@ -497,6 +504,7 @@ export default {
       dialectPickerVisible: false,
       writingPickerVisible: false,
       sourcePickerVisible: false,
+      stationContext: null,
       writingTypes: WRITING_TYPES,
       sourceTypes: SOURCE_TYPES,
       searchSuggestions: ['行', '害怕', 'hiŋ'],
@@ -555,6 +563,11 @@ export default {
         ? '听乡音和个人资料仍可正常使用。'
         : '检查网络后再试，已经输入的关键词和筛选条件都会保留。';
     },
+    stationParams() {
+      return stationContextParams(this.stationContext, {
+        dialectId: this.filters.dialectId || this.stationContext?.dialectId,
+      });
+    },
   },
   watch: {
     'filters.keyword': function suggestKeyword(value) {
@@ -576,6 +589,7 @@ export default {
   onShow() { this.history = searchHistory(); },
   onUnload() { clearTimeout(this.suggestTimer); this.suggestSequence += 1; },
   async onLoad(options = {}) {
+    this.stationContext = parseStationContext(options);
     this.history = searchHistory();
     popularEntries()
       .then((items) => { this.popular = pageResults(items); })
@@ -586,6 +600,10 @@ export default {
     } catch (error) {
       this.dialects = [];
     }
+    if (this.stationContext?.dialectId) {
+      this.filters.dialectId = this.stationContext.dialectId;
+      this.filters.dialectMatch = 'subtree';
+    }
     if (this.filters.keyword) await this.search();
   },
   methods: {
@@ -593,8 +611,15 @@ export default {
     clearHistory() { clearSearchHistory(); this.history = []; },
     dialectLabel,
     entryTitle,
-    goEntryDetail,
-    goRecord,
+    openEntry(id) {
+      goEntryDetail(id, this.stationParams);
+    },
+    startRecording() {
+      goRecord(this.stationParams);
+    },
+    continueStation() {
+      if (this.stationContext) goStation(this.stationParams);
+    },
     statusLabel(status) {
       return {
         draft: '初稿',

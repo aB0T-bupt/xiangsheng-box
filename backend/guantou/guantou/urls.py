@@ -14,6 +14,7 @@ from .v2_views import (
     EntryViewSet,
     EvidenceRecordViewSet,
     LegacyReviewCandidateViewSet,
+    LegacyLinkResolveView,
     MyContributionHistoryView,
     PronunciationVariantViewSet,
     RecordingEntryLinkViewSet,
@@ -71,6 +72,11 @@ router.register(
 )
 
 urlpatterns = [
+    path(
+        "legacy-links/resolve/",
+        LegacyLinkResolveView.as_view(),
+        name="legacy-link-resolve",
+    ),
     path("curation/", CurationView.as_view(), name="curation"),
     path("curation/tasks/", CurationTaskView.as_view(), name="curation-tasks"),
     path(

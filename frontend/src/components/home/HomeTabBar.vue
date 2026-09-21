@@ -69,7 +69,7 @@ export default {
     open(key) {
       if (key === this.active) return;
       if (key === 'listen') goHome(true);
-      if (key === 'search') goSearch({ reset: true });
+      if (key === 'search') goSearch({}, { reset: true });
       if (key === 'record') {
         if (requireAuth('record_recording', { page: 'main_navigation' })) goRecord();
       }

@@ -36,6 +36,8 @@ export const ROUTES = Object.freeze({
   themeAcquire: '/pages/users/theme-acquire',
   themeMember: '/pages/users/theme-member',
   themeEvent: '/pages/users/theme-event',
+  station: '/pages/stations/index',
+  stationLegacy: '/pages/stations/legacy',
 });
 
 function queryString(params = {}) {
@@ -106,11 +108,11 @@ export function goBack(fallback = ROUTES.home) {
 }
 
 export const goHome = (reset = false, params = {}) => openPage(ROUTES.home, params, { reset });
-export const goSearch = (options = {}) => openPage(ROUTES.search, {}, options);
+export const goSearch = (params = {}, options = {}) => openPage(ROUTES.search, params, options);
 export const goRecord = (params = {}, options = {}) => openPage(ROUTES.record, params, options);
-export const goEntryDetail = (id, options = {}) => openPage(
+export const goEntryDetail = (id, params = {}, options = {}) => openPage(
   ROUTES.entryDetail,
-  { id },
+  { id, ...params },
   options,
 );
 export const goMine = (reset = false) => openPage(ROUTES.mine, {}, { reset });
@@ -169,6 +171,10 @@ export const goThemeSearch = (keyword = '') => openPage(ROUTES.themeCenter, {
 export const goThemeAcquire = (params = {}) => openPage(ROUTES.themeAcquire, params);
 export const goThemeMember = (params = {}) => openPage(ROUTES.themeMember, params);
 export const goThemeEvent = (params = {}) => openPage(ROUTES.themeEvent, params);
+export const goStation = (params = {}, options = {}) => openPage(ROUTES.station, params, options);
+export const goStationLegacy = (params = {}, options = {}) => (
+  openPage(ROUTES.stationLegacy, params, options)
+);
 export default {
   ROUTES,
   currentRoute,
@@ -194,6 +200,8 @@ export default {
   goRecord,
   goRecommendFollow,
   goSearch,
+  goStation,
+  goStationLegacy,
   goUserDetail,
   goUserEmail,
   goUserInformation,
@@ -213,8 +221,14 @@ export default {
   routeDestination,
 };
 
-export function goRecordingDetail(id, options = {}) {
-  return openPage(ROUTES.recordingDetail, { id }, options);
+export function goRecordingDetail(id, params = {}, options = null) {
+  const legacyOptions = options === null
+    && Object.keys(params).every((key) => ['replace', 'reset'].includes(key));
+  return openPage(
+    ROUTES.recordingDetail,
+    legacyOptions ? { id } : { id, ...params },
+    legacyOptions ? params : (options || {}),
+  );
 }
 export const goRecordingDrafts = () => openPage(ROUTES.recordingDrafts);
 export const goCollections = (params = {}) => openPage(ROUTES.collections, params);

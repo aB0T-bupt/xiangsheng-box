@@ -1,5 +1,8 @@
 <template>
-  <PageShell title="一段乡音">
+  <PageShell
+    title="一段乡音"
+    :back-fallback="backFallback"
+  >
     <BaseLoading
       v-if="loading"
       text="正在读取乡音…"
@@ -31,7 +34,7 @@
           :detail-link="false"
           :community="false"
           :recording="recording"
-          @open-entry="goEntryDetail"
+          @open-entry="openEntry"
           @continue="recordFor"
         />
         <view class="box-actions">
@@ -66,9 +69,13 @@
           :key="link.id"
           variant="ghost"
           :text="`${entryTitle(link.entry)} · ${linkLabel(link)}`"
-          @click="goEntryDetail(link.entry.id)"
+          @click="openEntry(link.entry.id)"
         />
       </view>
+      <StationSourceBanner
+        :context="stationContext"
+        @continue="continueStation"
+      />
       <DiscussionThread
         :key="id"
         :target-id="id"
@@ -84,6 +91,7 @@ import BaseLoading from '@/components/BaseLoading.vue';
 import EmptyState from '@/components/EmptyState.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import CollectionPicker from '@/components/CollectionPicker.vue';
+import StationSourceBanner from '@/components/StationSourceBanner.vue';
 import {
   getRecording, entryTitle, dialectLabel,
 } from '@/services/entryRecording';
@@ -91,8 +99,11 @@ import {
   likeRecording,
 } from '@/services/recordingSocial';
 import {
-  goEntryDetail, goRecord, ROUTES, pageUrl,
+  goEntryDetail, goRecord, goStation, ROUTES, pageUrl,
 } from '@/services/navigation';
+import {
+  parseStationContext, stationContextParams, stationFallback,
+} from '@/services/stationContext';
 import { requireAuth } from '@/services/authGuard';
 import { notify } from '@/services/feedback';
 
@@ -105,6 +116,7 @@ export default {
     EmptyState,
     EntryRecordingCard,
     CollectionPicker,
+    StationSourceBanner,
   },
   data: () => ({
     id: null,
@@ -112,6 +124,7 @@ export default {
     loading: true,
     error: '',
     busy: false,
+    stationContext: null,
 
   }),
   computed: {
@@ -121,8 +134,17 @@ export default {
     shareType() {
       return typeof window === 'undefined' ? 'share' : '';
     },
+    contextParams() {
+      return stationContextParams(this.stationContext);
+    },
+    backFallback() {
+      if (!this.stationContext) return ROUTES.home;
+      const fallback = stationFallback(this.stationContext);
+      return pageUrl(fallback.path, fallback.params);
+    },
   },
-  onLoad(options) {
+  onLoad(options = {}) {
+    this.stationContext = parseStationContext(options);
     this.id = options.id;
   },
   onShow() {
@@ -137,11 +159,17 @@ export default {
   methods: {
     entryTitle,
     dialectLabel,
-    goEntryDetail,
+    openEntry(id) {
+      goEntryDetail(id, this.contextParams);
+    },
     recordFor(id) {
       goRecord({
         entry_id: id,
+        ...this.contextParams,
       });
+    },
+    continueStation() {
+      if (this.stationContext) goStation(this.contextParams);
     },
     linkLabel(link) {
       return {
@@ -191,8 +219,9 @@ export default {
         title: `乡声集盒 · ${this.recording.original_gloss}`,
         path: pageUrl(ROUTES.recordingDetail, {
           id: this.id,
+          ...this.contextParams,
         }),
-        query: `id=${this.id}`,
+        query: pageUrl('', { id: this.id, ...this.contextParams }).replace(/^\?/, ''),
       };
     },
     share() {
@@ -201,6 +230,7 @@ export default {
       const base = import.meta.env.BASE_URL.replace(/\/$/, '');
       const url = `${window.location.origin}${base}${pageUrl(ROUTES.recordingDetail, {
         id: this.id,
+        ...this.contextParams,
       })}`;
       uni.setClipboardData({
         data: url,

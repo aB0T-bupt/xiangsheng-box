@@ -1,5 +1,8 @@
 <template>
-  <PageShell title="词条详情">
+  <PageShell
+    title="词条详情"
+    :back-fallback="backFallback"
+  >
     <BaseLoading
       v-if="loading"
       text="正在读取词条…"
@@ -173,6 +176,7 @@
             :key="recording.id"
             :recording="recording"
             :attested="attestedDialects.has(recording.usage_dialect?.id)"
+            :detail-params="contextParams"
             @attest="attest"
             @continue="continueChain"
           />
@@ -238,6 +242,11 @@
         </view>
       </view>
 
+      <StationSourceBanner
+        :context="stationContext"
+        @continue="continueStation"
+      />
+
       <DiscussionThread
         :key="entry.id"
         target-type="entry"
@@ -286,6 +295,7 @@ import EmptyState from '@/components/EmptyState.vue';
 import DialectLabel from '@/components/DialectLabel.vue';
 import EntryRecordingCard from '@/components/EntryRecordingCard.vue';
 import PageShell from '@/components/PageShell.vue';
+import StationSourceBanner from '@/components/StationSourceBanner.vue';
 import { requireAuth } from '@/services/authGuard';
 import {
   createUsageAttestation,
@@ -297,7 +307,12 @@ import {
   unbookmarkEntry,
 } from '@/services/entryRecording';
 import { notifySuccess } from '@/services/feedback';
-import { goRecord } from '@/services/navigation';
+import {
+  goRecord, goStation, pageUrl,
+} from '@/services/navigation';
+import {
+  parseStationContext, stationContextParams, stationFallback,
+} from '@/services/stationContext';
 import { CAPABILITIES, ensureCapability } from '@/services/capabilities';
 import { PRODUCT_EVENTS, trackProductEvent } from '@/services/productAnalytics';
 
@@ -311,6 +326,7 @@ export default {
     EmptyState,
     EntryRecordingCard,
     PageShell,
+    StationSourceBanner,
   },
   data() {
     return {
@@ -320,9 +336,21 @@ export default {
       loading: true,
       errorMessage: '',
       attestedDialects: new Set(),
+      stationContext: null,
     };
   },
+  computed: {
+    contextParams() {
+      return stationContextParams(this.stationContext);
+    },
+    backFallback() {
+      if (!this.stationContext) return '/pages/index';
+      const fallback = stationFallback(this.stationContext);
+      return pageUrl(fallback.path, fallback.params);
+    },
+  },
   onLoad(options = {}) {
+    this.stationContext = parseStationContext(options);
     this.id = Number(options.id) || null;
     this.load();
   },
@@ -372,7 +400,10 @@ export default {
     },
     continueChain() {
       if (!requireAuth('record_recording', { page: 'entry_detail', entryId: this.id })) return;
-      goRecord({ entry_id: this.id });
+      goRecord({ entry_id: this.id, ...this.contextParams });
+    },
+    continueStation() {
+      if (this.stationContext) goStation(this.contextParams);
     },
     async toggleBookmark() {
       if (!requireAuth('bookmark_entry', { page: 'entry_detail', entryId: this.id })) return;
