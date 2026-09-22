@@ -33,15 +33,19 @@ function relativeScreenshot(group, filename) {
 }
 
 function contrastRatio(foreground, background) {
-  const channels = (value) => (String(value).match(/[\d.]+/g) || [])
-    .slice(0, 3)
-    .map(Number)
-    .map((channel) => {
+  const channels = (value) => {
+    const values = (String(value).match(/[\d.]+/g) || []).map(Number);
+    if (values.length < 3) throw new Error(`Unsupported color value: ${value}`);
+    if (values.length > 3 && values[3] < 1) {
+      throw new Error(`Contrast check requires an opaque rendered color: ${value}`);
+    }
+    return values.slice(0, 3).map((channel) => {
       const normalized = channel / 255;
       return normalized <= 0.04045
         ? normalized / 12.92
         : ((normalized + 0.055) / 1.055) ** 2.4;
     });
+  };
   const luminance = (value) => {
     const [red, green, blue] = channels(value);
     return (0.2126 * red) + (0.7152 * green) + (0.0722 * blue);
@@ -112,13 +116,30 @@ test.afterAll(async () => {
   });
 });
 
-[
-  { look: 'soft', route: '/pages/search', screenshot: 'button-soft-search' },
-  { look: 'fog', route: '/pages/circles/index', screenshot: 'button-fog-circles' },
-  { look: 'fog', route: '/pages/collections/index', screenshot: 'button-fog-collections' },
-].forEach(({ look, route, screenshot }) => {
-  test(`button contrast ${look} ${route} · #410`, async ({ page }) => {
-    await installVisualFixture(page, { persona: 'member', theme: 'light' });
+const BUTTON_ACCENTS = ['pine', 'tea', 'ink', 'clay', 'mist', 'osmanthus'];
+const BUTTON_THEMES = ['light', 'dark'];
+const BUTTON_CONTRAST_CASES = [
+  ...BUTTON_THEMES.flatMap((theme) => BUTTON_ACCENTS.flatMap((accent) => [
+    {
+      accent, look: 'soft', route: '/pages/search', screenshot: `button-soft-search-${theme}-${accent}`, theme,
+    },
+    {
+      accent, look: 'fog', route: '/pages/search', screenshot: `button-fog-search-${theme}-${accent}`, theme,
+    },
+  ])),
+  {
+    accent: 'pine', look: 'fog', route: '/pages/circles/index', screenshot: 'button-fog-circles-light-pine', theme: 'light',
+  },
+  {
+    accent: 'pine', look: 'fog', route: '/pages/collections/index', screenshot: 'button-fog-collections-light-pine', theme: 'light',
+  },
+];
+
+BUTTON_CONTRAST_CASES.forEach(({
+  accent, look, route, screenshot, theme,
+}) => {
+  test(`button contrast ${look} ${theme}/${accent} ${route} · #410`, async ({ page }) => {
+    await installVisualFixture(page, { accent, persona: 'member', theme });
     await page.addInitScript((selectedLook) => {
       localStorage.setItem('ui_button_style', selectedLook);
       localStorage.setItem('ui_button_ghost', selectedLook);
