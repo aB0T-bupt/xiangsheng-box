@@ -257,13 +257,6 @@ export default {
   --td-button-primary-bg-color: var(--accent-subtle-color);
 }
 
-.base-button--ghost.base-button--look-soft {
-  --td-brand-color: var(--accent-subtle-color);
-  --td-text-color-anti: var(--text-color);
-  --td-button-primary-color: var(--text-color);
-  --td-button-primary-bg-color: var(--accent-subtle-color);
-}
-
 .base-button--ghost.base-button--look-quiet {
   opacity: 0.86;
 }
