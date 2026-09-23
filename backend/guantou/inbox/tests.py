@@ -165,6 +165,8 @@ class InboxApiTests(TestCase):
                 "target_type": "entry",
                 "target_id": 42,
                 "target_url": "/pages/entries/details?id=42",
+                "comment_id": 7,
+                "parent_comment_id": 3,
             },
         )
 
@@ -179,8 +181,70 @@ class InboxApiTests(TestCase):
         self.assertEqual(item["verb"], Notification.Verb.USAGE_ATTESTATION)
         self.assertEqual(
             item["target"],
-            {"type": "entry", "id": 42, "url": "/pages/entries/details?id=42"},
+            {
+                "type": "entry",
+                "id": 42,
+                "url": "/pages/entries/details?id=42",
+                "comment_id": 7,
+                "parent_comment_id": 3,
+            },
         )
+
+    def test_list_filters_by_verb(self):
+        send_event_notification(
+            actor=self.sender,
+            recipient=self.recipient,
+            verb=Notification.Verb.RECORDING_LIKE,
+            description="赞了你的录音",
+        )
+        send_event_notification(
+            actor=self.sender,
+            recipient=self.recipient,
+            verb=Notification.Verb.ENTRY_BOOKMARK,
+            description="收藏了你的词条",
+        )
+
+        response = self.client.get(
+            "/notifications",
+            {"verb": "recording.like"},
+            HTTP_AUTHORIZATION=bearer(self.recipient),
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["total"], 1)
+        self.assertEqual(
+            response.json()["notifications"][0]["verb"],
+            Notification.Verb.RECORDING_LIKE,
+        )
+
+        response = self.client.get(
+            "/notifications",
+            {"verb": "recording.like,entry.bookmark"},
+            HTTP_AUTHORIZATION=bearer(self.recipient),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["total"], 2)
+        self.assertEqual(
+            {item["verb"] for item in response.json()["notifications"]},
+            {
+                Notification.Verb.RECORDING_LIKE,
+                Notification.Verb.ENTRY_BOOKMARK,
+            },
+        )
+
+        empty = self.client.get(
+            "/notifications",
+            {"verb": ","},
+            HTTP_AUTHORIZATION=bearer(self.recipient),
+        )
+        self.assertEqual(empty.status_code, 400)
+
+        unknown = self.client.get(
+            "/notifications",
+            {"verb": "recording.like,not-a-verb"},
+            HTTP_AUTHORIZATION=bearer(self.recipient),
+        )
+        self.assertEqual(unknown.status_code, 400)
 
     def test_event_notification_suppresses_self_notifications(self):
         result = send_event_notification(

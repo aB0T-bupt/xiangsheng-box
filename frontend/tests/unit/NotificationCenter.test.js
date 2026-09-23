@@ -7,6 +7,7 @@ vi.mock('@/services/mail', () => ({
 }));
 
 import NotificationCenter from '@/pages/mails/index.vue';
+import BaseButton from '@/components/BaseButton.vue';
 import { listNotifications, markNotificationsRead } from '@/services/mail';
 
 const notification = {
@@ -71,6 +72,29 @@ describe('notification center', () => {
     expect(wrapper.vm.senderInitial(notification)).toBe('乡');
   });
 
+  it('renders every filter through BaseButton and sends grouped verbs', async () => {
+    const wrapper = mountCenter();
+    const filters = wrapper.findAllComponents(BaseButton);
+
+    expect(filters).toHaveLength(5);
+    expect(filters.map((filter) => filter.text())).toEqual([
+      '全部',
+      '未读',
+      '回复',
+      '点赞',
+      '收藏',
+    ]);
+
+    wrapper.vm.setFilter('reply');
+    await flushPromises();
+
+    expect(listNotifications).toHaveBeenCalledWith({
+      page: 1,
+      pageSize: 20,
+      verb: 'entry.comment,entry.reply,recording.comment,recording.reply',
+    });
+  });
+
   it('marks one notification read before opening its target', async () => {
     const wrapper = mountCenter();
     wrapper.vm.notifications = [notification];
@@ -82,6 +106,42 @@ describe('notification center', () => {
     expect(notification.unread).toBe(true);
     expect(uni.navigateTo).toHaveBeenCalledWith({
       url: '/pages/entries/details?id=9',
+    });
+  });
+
+  it('opens comment notifications at the top-level or reply anchor', async () => {
+    const wrapper = mountCenter();
+    const topLevel = {
+      ...notification,
+      id: 13,
+      target: {
+        type: 'entry',
+        id: 9,
+        url: '/pages/entries/details?id=9',
+        comment_id: 42,
+        parent_comment_id: null,
+      },
+    };
+    const reply = {
+      ...notification,
+      id: 14,
+      target: {
+        type: 'recording',
+        id: 5,
+        url: '/pages/recordings/details?id=5',
+        comment_id: 16,
+        parent_comment_id: 1,
+      },
+    };
+
+    await wrapper.vm.openNotification(topLevel);
+    expect(uni.navigateTo).toHaveBeenLastCalledWith({
+      url: '/pages/entries/details?id=9&comment=42&root=42',
+    });
+
+    await wrapper.vm.openNotification(reply);
+    expect(uni.navigateTo).toHaveBeenLastCalledWith({
+      url: '/pages/recordings/details?id=5&comment=16&root=1',
     });
   });
 

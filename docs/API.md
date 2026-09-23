@@ -45,8 +45,8 @@ make api-contract-check
 - `GET /recordings/?following=true`：关注作者的公开录音；游客返回空列表。
 - `GET /recordings/daily/`、`random/`：公开每日精选／随机录音；没有候选时返回 204。
 - `PUT/DELETE /recordings/{id}/like/`：点赞／取消；返回 `liked`、`like_count`。
-- `GET /recording-comments/?recording_id=...&page=...`：标准分页，只返回可见的评论及一层回复。
-- `POST /recording-comments/`：`{recording_id,body,parent_id:null,client_id:"UUID"}`；同一作者重试相同请求返回原评论，改变内容需新 UUID。
+- `GET /recording-comments/?recording_id=...&page=...`：标准分页，只返回可见的一级评论；每项含 `reply_count` 和最多 3 条按时间升序的 `recent_replies`。带 `parent_id` 时改为分页读取该评论下的一层回复。
+- `POST /recording-comments/`：`{recording_id,body,parent_id:null,reply_to_id:null,client_id:"UUID"}`；`reply_to_id` 必须和 `parent_id` 指向同一条一级评论。同一作者重试相同请求返回原评论，改变内容需新 UUID。
 - `DELETE /recording-comments/{id}/`：作者删除／管理员隐藏，该评论下回复不再展示。
 - `PUT/DELETE /recording-comments/{id}/like/`：评论点赞／取消。
 - `GET /entries/suggestions/?q=...`、`popular/`：最多 8 个公开词条；推荐依照公开录音点赞及有效地区补证，不计私人收藏，不记录搜索原词。
@@ -55,6 +55,8 @@ make api-contract-check
 
 ### Entry 讨论（v1 能力二次补缺）
 
-`GET /entry-comments/?entry_id=<id>&page=1` 浏览可见词条讨论；`POST /entry-comments/` 接收 `entry_id`、`body`、`client_id`（UUID）及可选 `parent_id`。POST 必须且只能给出 entry_id，不能混入 recording_id；目标未公开即使本人可读取，也不能新增评论。一级回复必须属于同一词条，重复 UUID 与不同目标／正文冲突返回 400。
+`GET /entry-comments/?entry_id=<id>&page=1` 浏览可见词条讨论，返回字段与录音讨论一致；带 `parent_id` 时读取该评论下的一层回复。`POST /entry-comments/` 接收 `entry_id`、`body`、`client_id`（UUID）及可选 `parent_id`、`reply_to_id`。POST 必须且只能给出 entry_id，不能混入 recording_id；目标未公开即使本人可读取，也不能新增评论。一级回复必须属于同一词条，`reply_to_id` 必须指向该一级评论下的回复；重复 UUID 与不同目标／正文冲突返回 400。
 
 `DELETE /entry-comments/{id}/` 作者删除／管理员隐藏；`PUT` / `DELETE /entry-comments/{id}/like/` 点赞／取消。录音与词条接口互不读取或修改对方评论。事件为 `entry.comment`、`entry.reply`、`entry.comment_like`，通知回到对应词条；不把评论正文放进通知。隐藏主评论后回复同样不公开展示。
+
+消息中心 `GET /notifications` 支持 `unread`、`page`、`pageSize` 和逗号分隔的 `verb` 过滤；`verb=entry.comment,entry.reply` 表示按事件类型做 OR 筛选。评论与回复通知的 `target` 还带 `comment_id` 和 `parent_comment_id`：顶层评论用前者定位一级评论，回复用后者进入对应讨论串并加载具体回复。未知 `verb` 返回 400，避免拼错后静默返回空列表。`reply`、`like`、`bookmark` 等前端分类应映射到对应事件组，不要新增含义模糊的客户端过滤。

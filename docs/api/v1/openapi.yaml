@@ -24,6 +24,8 @@ tags:
     description: 整理授权、申请、待办和可追溯操作。
   - name: Platform
     description: 客户端能力与隐私最小化的产品事件。
+  - name: Notifications
+    description: 站内消息、未读状态与事件类型筛选。
 security:
   - bearerAuth: []
 paths:
@@ -494,6 +496,12 @@ paths:
             type: integer
             minimum: 1
           required: true
+        - name: parent_id
+          in: query
+          description: 提供时返回该一级评论下的一层回复
+          schema:
+            type: integer
+            minimum: 1
         - name: page
           in: query
           schema:
@@ -622,6 +630,12 @@ paths:
             type: integer
             minimum: 1
           required: true
+        - name: parent_id
+          in: query
+          description: 提供时返回该一级评论下的一层回复
+          schema:
+            type: integer
+            minimum: 1
         - name: page
           in: query
           schema:
@@ -1120,6 +1134,48 @@ paths:
         content: { application/json: { schema: { $ref: "#/components/schemas/ProductEventWrite" } } }
       responses:
         "201": { description: 已记录 }
+  /notifications:
+    get:
+      tags: [Notifications]
+      operationId: listNotifications
+      summary: 获取当前用户的站内消息
+      parameters:
+        - name: unread
+          in: query
+          schema:
+            type: boolean
+        - name: verb
+          in: query
+          description: 逗号分隔的事件类型；多项之间按 OR 过滤。
+          style: form
+          explode: false
+          schema:
+            type: array
+            items:
+              $ref: "#/components/schemas/NotificationVerb"
+        - name: page
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 1
+        - name: pageSize
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            default: 10
+      responses:
+        "200":
+          description: 成功
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NotificationPage"
+        "400":
+          description: 筛选或分页参数不合法
+        "401":
+          description: 未登录
 components:
   securitySchemes:
     bearerAuth:
@@ -1223,6 +1279,37 @@ components:
             recording_count:
               type: integer
               description: 去重后的可见录音数
+    CommentReply:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        parent_id:
+          type: integer
+          minimum: 1
+        body:
+          type: string
+        author_id:
+          type: integer
+          minimum: 1
+        author_name:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        reply_to_id:
+          type: integer
+          nullable: true
+        reply_to_author_name:
+          type: string
+        like_count:
+          type: integer
+          minimum: 0
+        liked:
+          type: boolean
+        editable:
+          type: boolean
     RecordingComment:
       type: object
       properties:
@@ -1245,8 +1332,21 @@ components:
         created_at:
           type: string
           format: date-time
+        reply_to_id:
+          type: integer
+          nullable: true
+        reply_to_author_name:
+          type: string
+        reply_count:
+          type: integer
+          minimum: 0
+        recent_replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentReply"
         like_count:
           type: integer
+          minimum: 0
         liked:
           type: boolean
         editable:
@@ -1258,6 +1358,9 @@ components:
           type: integer
           minimum: 1
         parent_id:
+          type: integer
+          nullable: true
+        reply_to_id:
           type: integer
           nullable: true
         body:
@@ -1293,8 +1396,21 @@ components:
         created_at:
           type: string
           format: date-time
+        reply_to_id:
+          type: integer
+          nullable: true
+        reply_to_author_name:
+          type: string
+        reply_count:
+          type: integer
+          minimum: 0
+        recent_replies:
+          type: array
+          items:
+            $ref: "#/components/schemas/CommentReply"
         like_count:
           type: integer
+          minimum: 0
         liked:
           type: boolean
         editable:
@@ -1306,6 +1422,9 @@ components:
           type: integer
           minimum: 1
         parent_id:
+          type: integer
+          nullable: true
+        reply_to_id:
           type: integer
           nullable: true
         body:
@@ -1325,6 +1444,87 @@ components:
         liked:
           type: boolean
         like_count:
+          type: integer
+          minimum: 0
+    NotificationVerb:
+      type: string
+      enum:
+        - system.message
+        - recording.like
+        - entry.comment
+        - entry.reply
+        - entry.comment_like
+        - recording.comment
+        - recording.reply
+        - recording.comment_like
+        - entry.bookmark
+        - entry.usage_attestation
+        - recording.entry_link
+        - curation.review
+    NotificationUser:
+      type: object
+      properties:
+        id:
+          type: integer
+          nullable: true
+        nickname:
+          type: string
+        avatar:
+          type: string
+    NotificationTarget:
+      type: object
+      properties:
+        type:
+          type: string
+        id:
+          type: integer
+          nullable: true
+        url:
+          type: string
+        comment_id:
+          type: integer
+          nullable: true
+          description: 通知对应的评论或回复 ID
+        parent_comment_id:
+          type: integer
+          nullable: true
+          description: 回复通知对应的一级评论 ID；顶层评论通知为 null
+    Notification:
+      type: object
+      properties:
+        id:
+          type: integer
+          minimum: 1
+        from:
+          $ref: "#/components/schemas/NotificationUser"
+        to:
+          $ref: "#/components/schemas/NotificationUser"
+        time:
+          type: string
+        title:
+          type: string
+        verb:
+          $ref: "#/components/schemas/NotificationVerb"
+        unread:
+          type: boolean
+        content:
+          type: string
+          nullable: true
+        public:
+          type: boolean
+        target:
+          $ref: "#/components/schemas/NotificationTarget"
+    NotificationPage:
+      type: object
+      properties:
+        notifications:
+          type: array
+          items:
+            $ref: "#/components/schemas/Notification"
+        total:
+          type: integer
+          minimum: 0
+        pages:
           type: integer
           minimum: 0
     CollectionPage:

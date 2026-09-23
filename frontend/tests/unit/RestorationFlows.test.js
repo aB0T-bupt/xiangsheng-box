@@ -63,8 +63,8 @@ describe('restored journeys', () => {
     const detail = context(Detail, { targetId: 5, targetType: 'recording', form: { body: '乡音' }, $refs: { commentForm: { validate: async () => true } } });
     createComment.mockRejectedValueOnce(new Error('offline')).mockResolvedValueOnce({ id: 1 });
     listComments.mockResolvedValue({ results: [], next: null });
-    await detail.send(); expect(detail.form.body).toBe('乡音');
-    await detail.send();
+    await detail.sendTopLevel(); expect(detail.form.body).toBe('乡音');
+    await detail.sendTopLevel();
     expect(createComment.mock.calls[0][0].client_id).toBe(createComment.mock.calls[1][0].client_id);
     expect(detail.form.body).toBe('');
   });
@@ -115,12 +115,202 @@ describe('draft interruption recovery', () => {
 describe('entry discussion payload', () => {
   it('posts to Entry discussion without accidentally attaching a Recording', async () => {
     const detail = context(Detail, { targetId: 9, targetType: 'entry', form: { body: '另一种用法' }, $refs: { commentForm: { validate: async () => true } } });
-    createComment.mockResolvedValue({ id: 1 });
-    listComments.mockResolvedValue({ results: [], next: null });
-    await detail.send();
+    createComment.mockResolvedValue({ id: 1, created_at: '2026-09-01T00:00:00Z' });
+    await detail.sendTopLevel();
     expect(createComment).toHaveBeenCalledWith(expect.objectContaining({ entry_id: 9 }), 'entry');
     expect(createComment.mock.calls[0][0]).not.toHaveProperty('recording_id');
-    expect(listComments).toHaveBeenCalledWith(9, 1, 'entry');
+    expect(detail.comments.map((comment) => comment.id)).toEqual([1]);
+  });
+
+  it('keeps a new top-level comment visible past page one without duplicating it later', async () => {
+    const firstPage = Array.from({ length: 15 }, (_, index) => ({
+      id: index + 1,
+      body: `留言${index + 1}`,
+      created_at: `2026-09-01T00:${String(index).padStart(2, '0')}:00Z`,
+    }));
+    const newest = {
+      id: 16,
+      body: '留言16',
+      created_at: '2026-09-01T00:15:00Z',
+    };
+    createComment.mockResolvedValue(newest);
+    listComments.mockResolvedValue({ results: [newest], next: null });
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      comments: firstPage,
+      commentsPage: 1,
+      commentsNext: 'next-page',
+      form: { body: newest.body },
+      $refs: { commentForm: { validate: async () => true } },
+    });
+
+    await detail.sendTopLevel();
+
+    expect(detail.comments.map((comment) => comment.id)).toEqual([
+      ...firstPage.map((comment) => comment.id),
+      newest.id,
+    ]);
+    expect(detail.form.body).toBe('');
+    expect(listComments).not.toHaveBeenCalled();
+
+    await detail.loadComments(true);
+
+    expect(listComments).toHaveBeenCalledWith(5, 2, 'recording');
+    expect(detail.comments.filter((comment) => comment.id === newest.id)).toHaveLength(1);
+  });
+});
+
+describe('discussion replies sheet', () => {
+  const makeReply = (n, parentId) => ({
+    id: n,
+    parent_id: parentId,
+    body: `回复${n}`,
+    author_name: 'A',
+    like_count: 0,
+    liked: false,
+    editable: false,
+    reply_to_id: null,
+    reply_to_author_name: '',
+  });
+
+  it('loads additional reply pages from the full replies sheet', async () => {
+    listComments.mockImplementation(async (id, page, type, parentId) => (
+      page === 1
+        ? { results: Array.from({ length: 15 }, (_, i) => makeReply(i + 1, parentId)), next: 'next-page' }
+        : { results: [makeReply(16, parentId)], next: null }
+    ));
+
+    const detail = context(Detail, { targetId: 5, targetType: 'recording' });
+    await detail.openReplies({ id: 1, author_name: '楼主', body: '顶层留言' });
+
+    expect(detail.sheetReplies).toHaveLength(15);
+    expect(detail.sheetNext).toBe('next-page');
+
+    await detail.loadSheetReplies(true);
+
+    expect(detail.sheetReplies).toHaveLength(16);
+    expect(detail.sheetNext).toBeNull();
+  });
+
+  it('ignores a stale replies response when switching discussion threads', async () => {
+    let resolveSlow;
+    listComments
+      .mockImplementationOnce(() => new Promise((resolve) => { resolveSlow = resolve; }))
+      .mockImplementationOnce(async (id, page, type, parentId) => ({
+        results: [makeReply(200, parentId)],
+        next: null,
+      }));
+
+    const detail = context(Detail, { targetId: 5, targetType: 'recording' });
+    const slow = detail.openReplies({ id: 1, author_name: 'A', body: 'A顶层' });
+    await Promise.resolve();
+    const fast = detail.openReplies({ id: 2, author_name: 'B', body: 'B顶层' });
+    await fast;
+
+    expect(detail.sheet.parent.id).toBe(2);
+
+    resolveSlow({ results: [makeReply(100, 1)], next: null });
+    await slow;
+
+    expect(detail.sheet.parent.id).toBe(2);
+    expect(detail.sheetReplies[0].parent_id).toBe(2);
+  });
+
+  it('keeps the newest reply visible after sending past the first page', async () => {
+    const firstPage = Array.from({ length: 15 }, (_, i) => makeReply(i + 1, 1));
+    listComments.mockImplementation(async (id, page, type, parentId) => (
+      page === 1
+        ? { results: firstPage, next: 'next-page' }
+        : { results: [makeReply(16, parentId)], next: null }
+    ));
+    createComment.mockResolvedValue({ id: 16, parent_id: 1, body: '回复16' });
+
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      sheet: {
+        visible: true,
+        parent: {
+          id: 1, author_name: '楼主', body: '顶层留言', reply_count: 15,
+        },
+        replyTarget: null,
+      },
+      replyDraft: { body: '回复16' },
+      $refs: { replyForm: { validate: async () => true } },
+    });
+
+    await detail.sendReply();
+
+    expect(detail.sheetReplies.map((item) => item.id)).toEqual([
+      ...firstPage.map((item) => item.id),
+      16,
+    ]);
+    expect(detail.sheetNext).toBeNull();
+    expect(detail.sheet.parent.reply_count).toBe(16);
+  });
+
+  it('loads and focuses a top-level comment anchor from a later page', async () => {
+    listComments
+      .mockResolvedValueOnce({
+        results: [{
+          id: 1, author_name: 'A', body: '首页评论', recent_replies: [], reply_count: 0,
+        }],
+        next: 'next-page',
+      })
+      .mockResolvedValueOnce({
+        results: [{
+          id: 42, author_name: 'B', body: '目标评论', recent_replies: [], reply_count: 0,
+        }],
+        next: null,
+      });
+    globalThis.uni = { pageScrollTo: vi.fn() };
+
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      anchorCommentId: 42,
+      anchorRootId: 42,
+      $nextTick: vi.fn(),
+    });
+    await detail.loadComments();
+    await detail.focusAnchor();
+
+    expect(detail.comments.map((comment) => comment.id)).toEqual([1, 42]);
+    expect(uni.pageScrollTo).toHaveBeenCalledWith({
+      selector: '#comment-42',
+      duration: 300,
+    });
+    delete globalThis.uni;
+  });
+
+  it('opens the parent thread and focuses a reply anchor from a later page', async () => {
+    const root = {
+      id: 1, author_name: '楼主', body: '顶层留言', reply_count: 16,
+    };
+    listComments.mockImplementation(async (id, page, type, parentId) => {
+      if (!parentId) return { results: [root], next: null };
+      return page === 1
+        ? {
+          results: Array.from({ length: 15 }, (_, index) => makeReply(index + 1, parentId)),
+          next: 'next-page',
+        }
+        : { results: [makeReply(16, parentId)], next: null };
+    });
+
+    const detail = context(Detail, {
+      targetId: 5,
+      targetType: 'recording',
+      anchorCommentId: 16,
+      anchorRootId: 1,
+    });
+    await detail.loadComments();
+    await detail.focusAnchor();
+
+    expect(detail.sheet.visible).toBe(true);
+    expect(detail.sheet.parent.id).toBe(1);
+    expect(detail.sheetReplies.map((reply) => reply.id)).toContain(16);
+    expect(detail.sheetScrollTarget).toBe('reply-16');
   });
 });
 

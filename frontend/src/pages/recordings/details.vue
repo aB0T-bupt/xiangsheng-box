@@ -72,6 +72,8 @@
       <DiscussionThread
         :key="id"
         :target-id="id"
+        :anchor-comment-id="anchorCommentId"
+        :anchor-root-id="anchorRootId"
       />
     </view>
   </PageShell>
@@ -108,6 +110,8 @@ export default {
   },
   data: () => ({
     id: null,
+    anchorCommentId: null,
+    anchorRootId: null,
     recording: null,
     loading: true,
     error: '',
@@ -122,8 +126,10 @@ export default {
       return typeof window === 'undefined' ? 'share' : '';
     },
   },
-  onLoad(options) {
+  onLoad(options = {}) {
     this.id = options.id;
+    this.anchorCommentId = Number(options.comment) || null;
+    this.anchorRootId = Number(options.root) || this.anchorCommentId;
   },
   onShow() {
     this.load();

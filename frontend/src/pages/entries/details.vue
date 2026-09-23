@@ -242,6 +242,8 @@
         :key="entry.id"
         target-type="entry"
         :target-id="entry.id"
+        :anchor-comment-id="anchorCommentId"
+        :anchor-root-id="anchorRootId"
       />
       <view
         class="detail-actions"
@@ -315,6 +317,8 @@ export default {
   data() {
     return {
       id: null,
+      anchorCommentId: null,
+      anchorRootId: null,
       entry: null,
       recordings: [],
       loading: true,
@@ -324,6 +328,8 @@ export default {
   },
   onLoad(options = {}) {
     this.id = Number(options.id) || null;
+    this.anchorCommentId = Number(options.comment) || null;
+    this.anchorRootId = Number(options.root) || this.anchorCommentId;
     this.load();
   },
   onShow() {

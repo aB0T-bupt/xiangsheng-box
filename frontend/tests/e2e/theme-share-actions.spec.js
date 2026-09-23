@@ -7,12 +7,33 @@ import {
   openVisualRoute,
 } from './helpers/visualReviewFixture';
 
-function colorChannels(color) {
+function colorValue(color) {
   const normalized = color.trim();
   if (/^#[0-9a-f]{6}$/i.test(normalized)) {
-    return normalized.slice(1).match(/.{2}/g).map((value) => Number.parseInt(value, 16));
+    return {
+      channels: normalized.slice(1).match(/.{2}/g)
+        .map((value) => Number.parseInt(value, 16)),
+      alpha: 1,
+    };
   }
-  return normalized.match(/[\d.]+/g).slice(0, 3).map(Number);
+  const values = normalized.match(/[\d.]+/g).map(Number);
+  return {
+    channels: values.slice(0, 3),
+    alpha: values.length > 3 ? values[3] : 1,
+  };
+}
+
+function colorChannels(color) {
+  return colorValue(color).channels;
+}
+
+function compositeColor(foreground, background) {
+  const front = colorValue(foreground);
+  const back = colorValue(background);
+  const channels = front.channels.map((value, index) => (
+    (value * front.alpha) + (back.channels[index] * (1 - front.alpha))
+  ));
+  return `rgb(${channels.map((value) => Math.round(value)).join(', ')})`;
 }
 
 function relativeLuminance(color) {
@@ -63,13 +84,18 @@ function contrastRatio(foreground, background) {
       return {
         accent: getComputedStyle(document.documentElement)
           .getPropertyValue('--accent-color').trim(),
-        background: overlay.backgroundColor,
+        baseBackground: style.backgroundColor,
+        overlayBackground: overlay.backgroundColor,
         border: overlay.borderTopColor,
         color: style.color,
       };
     });
     expect(colorChannels(activeStyle.border)).toEqual(colorChannels(activeStyle.accent));
-    expect(contrastRatio(activeStyle.color, activeStyle.background)).toBeGreaterThanOrEqual(4.5);
+    const effectiveBackground = compositeColor(
+      activeStyle.overlayBackground,
+      activeStyle.baseBackground,
+    );
+    expect(contrastRatio(activeStyle.color, effectiveBackground)).toBeGreaterThanOrEqual(4.5);
     await expect(horizontalOverflow(page)).resolves.toBeLessThanOrEqual(2);
     await stableScreenshot(page, {
       path: `test-results/theme-share-actions-${appearance}-390x844.png`,

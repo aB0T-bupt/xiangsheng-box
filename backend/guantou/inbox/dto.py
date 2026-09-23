@@ -9,6 +9,8 @@ def notification_normal(notification: Notification) -> dict:
         "type": metadata.get("target_type", ""),
         "id": metadata.get("target_id"),
         "url": metadata.get("target_url", ""),
+        "comment_id": metadata.get("comment_id"),
+        "parent_comment_id": metadata.get("parent_comment_id"),
     }
     return {
         "id": notification.id,
