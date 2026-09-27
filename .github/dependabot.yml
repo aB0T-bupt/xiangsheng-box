@@ -16,6 +16,33 @@ updates:
       interval: daily
     rebase-strategy: auto
     open-pull-requests-limit: 5
+    groups:
+      dcloudio-uni-app-batch:
+        applies-to: version-updates
+        patterns:
+          - "@dcloudio/uni-app*"
+          - "@dcloudio/uni-components"
+          - "@dcloudio/uni-h5"
+          - "@dcloudio/uni-mp-*"
+          - "@dcloudio/uni-quickapp-webview"
+          - "@dcloudio/uni-automator"
+          - "@dcloudio/uni-cli-shared"
+          - "@dcloudio/uni-stacktracey"
+          - "@dcloudio/vite-plugin-uni"
+    # Vite major upgrades must move with @dcloudio/vite-plugin-uni,
+    # @vitejs/plugin-vue, and Vitest. package.json resolutions pin Vite and
+    # Rollup to the versions validated with that toolchain, so neither may be
+    # upgraded independently. Keep minor and patch updates automated.
+    ignore:
+      - dependency-name: vite
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: rollup
+        update-types:
+          - "version-update:semver-major"
+      - dependency-name: vitest
+        update-types:
+          - "version-update:semver-major"
     commit-message:
       prefix: "build(deps)"
       prefix-development: "build(deps-dev)"
