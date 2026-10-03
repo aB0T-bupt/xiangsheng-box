@@ -1,4 +1,4 @@
-﻿platform,evidence_kind,legacy_route,source_pattern,category,target,mapping_key,fallback,risk,source
+platform,evidence_kind,legacy_route,source_pattern,category,target,mapping_key,fallback,risk,source
 Web,登记路由,/,/,品牌首页,S（待实现）,登记 profile,H + 承接说明,Station 路由尚未合并,https://github.com/e-dialect/hinghwa-dict-web/blob/8f4a6b67fac6fc171744cdc1c874c689b45b883d/src/router/index.js#L9
 Web,登记路由,/Home,/Home,品牌首页,S（待实现）,登记 profile,H + 承接说明,Station 路由尚未合并,https://github.com/e-dialect/hinghwa-dict-web/blob/8f4a6b67fac6fc171744cdc1c874c689b45b883d/src/router/index.js#L13
 Web,登记路由,/About,/About,关于,S 的关于说明（待实现）,品牌文案与来源,H,公开品牌说明待评审,https://github.com/e-dialect/hinghwa-dict-web/blob/8f4a6b67fac6fc171744cdc1c874c689b45b883d/src/router/index.js#L18

@@ -11,11 +11,13 @@
 | 旧 Web | `8f4a6b67fac6fc171744cdc1c874c689b45b883d` | [router/index.js](https://github.com/e-dialect/hinghwa-dict-web/blob/8f4a6b67fac6fc171744cdc1c874c689b45b883d/src/router/index.js)、[pc2mob.json](https://github.com/e-dialect/hinghwa-dict-web/blob/8f4a6b67fac6fc171744cdc1c874c689b45b883d/src/router/pc2mob.json)、[Footer.vue](https://github.com/e-dialect/hinghwa-dict-web/blob/8f4a6b67fac6fc171744cdc1c874c689b45b883d/src/components/HeaderAndFooter/Footer.vue) |
 | 旧小程序 / 移动 H5 | `330aa04df0b0423fedf513a683854c3415e96080` | [pages.json](https://github.com/e-dialect/hinghwa-dict-uni-app/blob/330aa04df0b0423fedf513a683854c3415e96080/src/pages.json)、[pc2mob.js](https://github.com/e-dialect/hinghwa-dict-uni-app/blob/330aa04df0b0423fedf513a683854c3415e96080/src/routers/pc2mob.js)、[mob2pc.js](https://github.com/e-dialect/hinghwa-dict-uni-app/blob/330aa04df0b0423fedf513a683854c3415e96080/src/routers/mob2pc.js)、`src/routers/*.js`、页面 `onShareAppMessage` 和 `services/shareMessages.js` |
 | 旧后端 | `3a42c2656640330b84d8cb3d8666457f7276b4fa` | `HinghwaDict/urls.py`、`word/word/urls.py`、`word/pronunciation/urls.py`；用于区分对象和 API，不将后台 API 当用户落地页 |
-| 新仓库 | `95aaeb648d1006f1c957c5e866d744f91a1a6bd7` | `frontend/src/pages.json`、搜索 / 录音 `onLoad`、`guantou/legacy_import.py` V2 导入路径与台账 |
+| 新仓库 | `95aaeb648d1006f1c957c5e866d744f91a1a6bd7` | `frontend/src/pages.json`、搜索 / 录音 `onLoad`、[backend/guantou/guantou/legacy_import.py](https://github.com/e-dialect/xiangsheng-box/blob/95aaeb648d1006f1c957c5e866d744f91a1a6bd7/backend/guantou/guantou/legacy_import.py) V2 导入路径与台账 |
 
 [逐项清单 CSV](assets/x4/legacy-route-inventory.csv) 对 Web 登记路由、小程序登记页、双向桥接产生的别名、分享和导航生成器路径逐项记录来源行号、映射键、目标、fallback 和风险；同一路径的不同来源保留多条记录，便于查证。`source_pattern` 保留源码原始字符串，`legacy_route` 展开相对路径与工具数据中运行时添加的 `/pages` 前缀。登记页包括受保护编辑和管理入口，标注为需要登录 / 权限，不将“源码可发现”解释为匿名可访问。
 
-清单计数：Web 登记路由 48、小程序登记页 57、Web 桥接来源模式 48、移动桥接来源模式 59、实际分享生成器 16、实际导航生成器 55、工具数据入口 8，共 **291 条来源记录**、按平台与完整模式去重后 **183 项**。搜索分享采用 `const path = ...` 再返回变量，也计入生成器；不能只搜索 `path:` 而遗漏它。
+清单计数：Web 登记路由 48、小程序登记页 57、Web 桥接来源模式 48、移动桥接来源模式 59、实际分享生成器 16、实际导航生成器 55、工具数据入口 8，共 **291 条来源记录**。按 `(platform, legacy_route)` 去重后为 **183 项**；按 `(platform, source_pattern)` 去重后为 **250 项**；单独按 `source_pattern` 去重后为 **213 项**。其中 `legacy_route` 是展开后的入口，`source_pattern` 是源码原始字符串，两种列的计数不可混用。搜索分享采用 `const path = ...` 再返回变量，也计入生成器；不能只搜索 `path:` 而遗漏它。
+
+CSV 使用 **UTF-8（无 BOM）** 编码，按标准 `utf-8` 解码即可读取首列名 `platform`，无需去除隐藏的 BOM 字符。
 
 所有本次审计读到的源码路线均有明确处置。源码版本之后的生产差异、旧部署配置中的服务端 rewrite、搜索引擎残留和更多分享参数，需要后续用日志补充；本表不宣称覆盖未知生产入口。旧仓库许可证入口为各自 `LICENSE`（AGPL-3.0，部分依赖另有许可证）；本交付只归纳路由事实并引用源码，不复制实现或历史文章正文。
 
@@ -126,6 +128,6 @@ CSV 中目标为 S、E、R、C 的记录表达承接设计或有条件目标，�
 | 不可映射项有 fallback | CSV 每项 fallback + 第 2、4 节退化规则 |
 | 对齐 CM-03 | 第 5 节 source key、目标模型、状态与未支持类型 |
 
-实际检查（2026-10-03）：逐条核对 CSV 来源文件 / 行号和原始字符串；确认 48 + 57 个登记入口均覆盖、291 条来源记录 / 183 个去重模式，文档本地链接存在，答题搜索不误归类为词条搜索，账户参数入口与异常分享 / 导航别名有 fallback。独立 agent 审查发现的手机号登记状态、遗漏积分入口、账户参数意图和原型返回问题均已修正。
+实际检查（2026-10-03）：逐条核对 CSV 来源文件 / 行号和原始字符串；确认 48 + 57 个登记入口均覆盖、291 条来源记录、183 个 `(platform, legacy_route)` 去重项及 250 个 `(platform, source_pattern)` 去重项，文档本地链接存在，答题搜索不误归类为词条搜索，账户参数入口与异常分享 / 导航别名有 fallback。独立 agent 审查发现的手机号登记状态、遗漏积分入口、账户参数意图和原型返回问题均已修正。审查建议补充的列名计数口径、导入器完整路径及 CSV 无 BOM 编码均已落实。
 
 未验证：生产访问量排序、真实旧词 / 录音 ID 在新库的存在性与可见性、登录主体映射、微信真机、旧域名 rewrite 与 redirect 上线。它们在 #432 / #433 及后续实现与发布 Gate 中核对；本 Leaf 完成的是可 review 的映射设计。
