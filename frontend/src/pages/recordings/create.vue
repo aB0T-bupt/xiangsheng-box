@@ -736,11 +736,12 @@ export default {
         };
         const failureMessage = error?.message || error?.errMsg || '请检查网络后重试';
         const draftResult = await this.saveDraft({ silent: true });
+        const draftFailureMessage = String(draftResult?.message || '草稿未完整保存').replace(/[。\s]+$/, '');
         const recoveryMessage = draftResult?.restorable
           ? '草稿已保存，可从草稿箱重试。'
-          : `${draftResult?.message || '草稿未完整保存'}，请保留本页重试。`;
+          : `${draftFailureMessage}${draftFailureMessage.includes('请保留本页重试') ? '' : '，请保留本页重试'}。`;
         this.draftMessage = `提交失败：${failureMessage}。尚未加入个人贡献。${recoveryMessage}`;
-        notify({ title: this.draftMessage, icon: 'none' });
+        notify({ title: '提交失败，请查看页面说明', icon: 'none' });
       } finally {
         this.submitting = false;
       }

@@ -1,4 +1,6 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import {
+  beforeEach, describe, expect, it, vi,
+} from 'vitest';
 
 vi.mock('@/services/recordingDrafts', () => ({
   draftOwner: vi.fn(() => 'user:1'),
@@ -9,8 +11,12 @@ vi.mock('@/services/recordingDrafts', () => ({
 }));
 vi.mock('@/services/file', () => ({ uploadFile: vi.fn() }));
 vi.mock('@/services/entryRecording', () => ({
-  createRecording: vi.fn(), dialectLabel: vi.fn(), entryTitle: vi.fn(),
-  getEntry: vi.fn(), listEntries: vi.fn(), pageResults: vi.fn(),
+  createRecording: vi.fn(),
+  dialectLabel: vi.fn(),
+  entryTitle: vi.fn(),
+  getEntry: vi.fn(),
+  listEntries: vi.fn(),
+  pageResults: vi.fn(),
 }));
 vi.mock('@/services/feedback', () => ({
   confirm: vi.fn(), notify: vi.fn(), notifySuccess: vi.fn(),
@@ -31,7 +37,8 @@ const RecordingCreate = (await import('@/pages/recordings/create.vue')).default;
 
 function pageContext() {
   const page = {
-    ...RecordingCreate.data(), ...RecordingCreate.methods,
+    ...RecordingCreate.data(),
+    ...RecordingCreate.methods,
     ownerScope: 'user:1',
     $refs: { form: { validate: vi.fn(async () => true) } },
   };
@@ -81,7 +88,7 @@ describe('recording submission failure feedback', () => {
     expect(page.draftMessage).toContain('草稿箱已满');
     expect(page.draftMessage).toContain('请保留本页重试');
     expect(page.draftMessage).not.toContain('从草稿箱重试');
-    expect(notify).toHaveBeenLastCalledWith({ title: page.draftMessage, icon: 'none' });
+    expect(notify).toHaveBeenLastCalledWith({ title: '提交失败，请查看页面说明', icon: 'none' });
   });
 
   it('does not promise restoration of edits made while saving', async () => {
@@ -93,6 +100,14 @@ describe('recording submission failure feedback', () => {
     await page.submit();
     expect(page.draftMessage).toContain('新修改仍待保存');
     expect(page.draftMessage).not.toContain('从草稿箱重试');
+  });
+
+  it('shows one recovery instruction when audio persistence fails', async () => {
+    saveRecordingDraft.mockResolvedValue({ id: 'draft-1', audio: null, audioError: true });
+    const page = pageContext();
+    await page.submit();
+    expect(page.draftMessage.match(/请保留本页重试/g)).toHaveLength(1);
+    expect(notify).toHaveBeenLastCalledWith({ title: '提交失败，请查看页面说明', icon: 'none' });
   });
 
   it('reports recording API failure after upload and retains recovery instructions', async () => {
